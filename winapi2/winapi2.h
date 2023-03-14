@@ -94,7 +94,7 @@ void loadConfig(UINT& currentlyChecked, HWND hWnd, int& wordCount)
 
 
 	char sResult[255] = {};
-	int copied = GetPrivateProfileStringA("start", "config", NULL, sResult, 255, "C:/Users/adam/Desktop/config.ini");
+	int copied = GetPrivateProfileStringA("start", "config", NULL, sResult, 255, "config.ini");
 
 	if (sResult[0] == hard[0])
 	{
@@ -124,16 +124,16 @@ void loadConfig(UINT& currentlyChecked, HWND hWnd, int& wordCount)
 void saveConfig(UINT& currentlyChecked)
 {
 	if (currentlyChecked == IDM_DIFFICULTY_EASY)
-		WritePrivateProfileStringA("start", "config", "EASY", "C:/Users/adam/Desktop/config.ini");
+		WritePrivateProfileStringA("start", "config", "EASY", "config.ini");
 	if (currentlyChecked == IDM_DIFFICULTY_MEDIUM)
-		WritePrivateProfileStringA("start", "config", "MEDIUM", "C:/Users/adam/Desktop/config.ini");
+		WritePrivateProfileStringA("start", "config", "MEDIUM", "config.ini");
 	if (currentlyChecked == IDM_DIFFICULTY_HARD)
-		WritePrivateProfileStringA("start", "config", "HARD", "C:/Users/adam/Desktop/config.ini");
+		WritePrivateProfileStringA("start", "config", "HARD", "config.ini");
 }
 
 void LoadDictionary(std::set<std::string>& dictionary)
 {
-	std::ifstream in{ "../../WinApi_Home/WinApi_Home/Wordle.txt" };
+	std::ifstream in{ "Wordle.txt" };
 	std::string s;
 	while(!in.eof())
 	{
@@ -204,8 +204,8 @@ void setOverlay(HWND hWnd, HDC hdc, COLORREF color, HINSTANCE hInstance)
 {
 	RECT rc;
 	GetWindowRect(hWnd, &rc);
-	HWND overlayWindow = CreateWindowEx(WS_EX_LAYERED | WS_EX_TRANSPARENT,
-		L"GAME CLASS", L"sad", NULL,
+	HWND overlayWindow = CreateWindowEx(WS_OVERLAPPEDWINDOW,
+		L"OVERLAY WINDOW", L"sad", NULL,
 		rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
 		hWnd, NULL, hInstance, NULL);
 	SetLayeredWindowAttributes(overlayWindow, RGB(0, 0, 0), 0, LWA_COLORKEY);

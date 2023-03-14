@@ -50,9 +50,9 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\Desktop\config.ini" />
+    <Text Include="Wordle.txt" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="..\..\WinApi_Home\WinApi_Home\Wordle.txt" />
+    <None Include="config.ini" />
   </ItemGroup>
 </Project>

@@ -29,6 +29,7 @@
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 ATOM                MyRegisterClassGame(HINSTANCE hInstance);
+ATOM                MyRegisterClassOverlay(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK    WndProcGame(HWND, UINT, WPARAM, LPARAM);
@@ -76,6 +77,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     LoadStringW(hInstance, IDC_WINAPI2, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
     MyRegisterClassGame(hInstance);
+    MyRegisterClassOverlay(hInstance);
 
     // Perform application initialization:
     if (!InitInstance (hInstance, nCmdShow))
@@ -155,7 +157,7 @@ ATOM MyRegisterClassOverlay(HINSTANCE hInstance)
     wcex.cbSize = sizeof(WNDCLASSEX);
 
     wcex.style = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc = WndProcGame;
+    wcex.lpfnWndProc = NULL;
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
