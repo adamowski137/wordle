@@ -33,6 +33,8 @@ ATOM                MyRegisterClassOverlay(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK    WndProcGame(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK    WndProcOverlay(HWND, UINT, WPARAM, LPARAM);
+
 
 
 // Global Variables:
@@ -49,7 +51,7 @@ int currentLine[WINDOWAMOUNT] = {};
 char letters[MAXWORDS][LETTERSAMOUNT];
 RECT letterRect[MAXWORDS][LETTERSAMOUNT];
 std::set<std::string> dictionary;
-std::map<char, RECT> keyboard;
+RECT keyboard[128][WINDOWAMOUNT + 1];
 char keyboardLetters[26] = 
   { 'q', 'w', 'e', 'r', 't', 'y','u', 'i', 'o', 'p',
     'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l',
@@ -57,6 +59,7 @@ char keyboardLetters[26] =
 std::string chosenWords[WINDOWAMOUNT];
 int color[WINDOWAMOUNT][MAXWORDS][LETTERSAMOUNT] = {};
 bool finished[WINDOWAMOUNT] = {};
+int letterColor[128] = {};
 
 
 
@@ -157,7 +160,7 @@ ATOM MyRegisterClassOverlay(HINSTANCE hInstance)
     wcex.cbSize = sizeof(WNDCLASSEX);
 
     wcex.style = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc = NULL;
+    wcex.lpfnWndProc = WndProcOverlay;
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
@@ -193,9 +196,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    rc = { 0, 0, ROWWIDTH, 0};
    AdjustWindowRectEx(&rc, WS_OVERLAPPEDWINDOW, false, 0);
   
-   for(int i = 0; i < 4; i++)
+   for (int i = 0; i < 4; i++)
+   {
+
     gameWindows[i] = CreateWindowW(L"GAME CLASS", L"WORDLE - PUZZLE", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
        0, 0, rc.right - rc.left, 0, hWnd, nullptr, hInst, nullptr);
+   }
 
    if (!hWnd)
    {
@@ -282,41 +288,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             RECT rc;
             GetClientRect(hWnd, &rc);
             
-            int start = ((rc.right - rc.left) - 10 * (TILESIZE + MARGIN))/2;
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 26; i++)
             {
-                RECT rect = { start, MARGIN, start + TILESIZE, TILESIZE + MARGIN };
-                keyboard.insert(std::pair<char, RECT>(keyboardLetters[i], rect));
-                
-                RoundRect(hdc, start, MARGIN, start + TILESIZE, TILESIZE + MARGIN, MARGIN, MARGIN);
-                start += TILESIZE + MARGIN;
+                RoundRect(hdc, keyboard[keyboardLetters[i]][WINDOWAMOUNT].left, keyboard[keyboardLetters[i]][WINDOWAMOUNT].top,
+                    keyboard[keyboardLetters[i]][WINDOWAMOUNT].right, keyboard[keyboardLetters[i]][WINDOWAMOUNT].bottom,
+                    MARGIN, MARGIN);
                 wchar_t s[2];
                 swprintf_s(s, 2, L"%c", toupper(keyboardLetters[i]));
-                DrawText(hdc, s, 1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                DrawText(hdc, s, 1, &keyboard[keyboardLetters[i]][WINDOWAMOUNT], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             }
-            start = ((rc.right - rc.left) - 9 * (TILESIZE + MARGIN)) / 2;
-            for (int i = 0; i < 9; i++)
-            {
-                RECT rect = { start, TILESIZE + 2 * MARGIN, start + TILESIZE,  2 * TILESIZE + 2 * MARGIN };
-                keyboard.insert(std::pair<char, RECT>(keyboardLetters[i + 10], rect));
-                RoundRect(hdc, start, TILESIZE + 2 * MARGIN, start + TILESIZE, 2 * TILESIZE + 2* MARGIN, MARGIN, MARGIN);
-                start += TILESIZE + MARGIN;
-                wchar_t s[2];
-                swprintf_s(s, 2, L"%c", toupper(keyboardLetters[i + 10]));
-                DrawText(hdc, s, 1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-            }
-            start = ((rc.right - rc.left) - 7 * (TILESIZE + MARGIN)) / 2;
-            for (int i = 0; i < 7; i++)
-            {
-                RECT rect = { start, 2 * TILESIZE + 3 * MARGIN, start + TILESIZE, 3 * TILESIZE + 3 * MARGIN};
-                keyboard.insert(std::pair<char, RECT>(keyboardLetters[i + 19], rect));
-                RoundRect(hdc, start, 2*TILESIZE + 3*MARGIN, start + TILESIZE, 3*TILESIZE + 3*MARGIN, MARGIN, MARGIN);
-                start += TILESIZE + MARGIN;
-                wchar_t s[2];
-                swprintf_s(s, 2, L"%c", toupper(keyboardLetters[i + 19]));
-                DrawText(hdc, s, 1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-            }
-
             SelectObject(hdc, oldPen);
             SelectObject(hdc, oldBrush);
             DeleteObject(brush);
@@ -340,6 +320,41 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             posY += TILESIZE + MARGIN;
         }
         SetTimer(hWnd, GAMETIME_ID, 10, NULL);
+
+        RECT rc;
+        GetClientRect(hWnd, &rc);
+
+        int start = ((rc.right - rc.left) - 10 * (TILESIZE + MARGIN)) / 2;
+        for (int i = 0; i < 10; i++)
+        {
+            RECT rect = { start, MARGIN, start + TILESIZE, TILESIZE + MARGIN };
+            keyboard[keyboardLetters[i]][WINDOWAMOUNT] = rect;
+            RECT rect1 = { rect.left, rect.top, (rect.left + rect.right) / 2, (rect.bottom + rect.top) / 2 };
+            keyboard[keyboardLetters[i]][0] = rect1;
+            RECT rect2 = { (rect.left + rect.right) / 2, rect.top, rect.right, (rect.bottom + rect.top) / 2 };
+            keyboard[keyboardLetters[i]][1] = rect2;
+            RECT rect3 = { rect.left, (rect.bottom + rect.top) / 2, (rect.left + rect.right) / 2, rect.bottom };
+            keyboard[keyboardLetters[i]][2] = rect3;
+            RECT rect4 = { (rect.left + rect.right) / 2, (rect.bottom + rect.top) / 2, rect.right, rect.bottom };
+            keyboard[keyboardLetters[i]][3] = rect4;
+
+            start += TILESIZE + MARGIN;
+        }
+        start = ((rc.right - rc.left) - 9 * (TILESIZE + MARGIN)) / 2;
+        for (int i = 0; i < 9; i++)
+        {
+            RECT rect = { start, TILESIZE + 2 * MARGIN, start + TILESIZE,  2 * TILESIZE + 2 * MARGIN };
+            keyboard[keyboardLetters[i + 10]][WINDOWAMOUNT] = rect;
+            start += TILESIZE + MARGIN;
+        }
+        start = ((rc.right - rc.left) - 7 * (TILESIZE + MARGIN)) / 2;
+        for (int i = 0; i < 7; i++)
+        {
+            RECT rect = { start, 2 * TILESIZE + 3 * MARGIN, start + TILESIZE, 3 * TILESIZE + 3 * MARGIN };
+            keyboard[keyboardLetters[i + 19]][WINDOWAMOUNT] = rect;
+            start += TILESIZE + MARGIN;
+        }
+
     }
         break;
     case WM_TIMER:
@@ -515,6 +530,28 @@ LRESULT CALLBACK WndProcGame(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
     }
     case WM_ERASEBKGND:
         return 1;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
+
+LRESULT CALLBACK WndProcOverlay(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_PAINT:
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+
+        EndPaint(hWnd, &ps);
+    }
+    break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }

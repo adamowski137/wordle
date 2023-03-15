@@ -204,15 +204,16 @@ void setOverlay(HWND hWnd, HDC hdc, COLORREF color, HINSTANCE hInstance)
 {
 	RECT rc;
 	GetWindowRect(hWnd, &rc);
-	HWND overlayWindow = CreateWindowEx(WS_OVERLAPPEDWINDOW,
-		L"OVERLAY WINDOW", L"sad", NULL,
-		rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
+	HWND overlayWindow = CreateWindowW(L"OVERLAY WINDOW", L"sad",
+		  WS_VISIBLE,
+		0, 0, rc.right - rc.left, rc.bottom - rc.top,
 		hWnd, NULL, hInstance, NULL);
-	SetLayeredWindowAttributes(overlayWindow, RGB(0, 0, 0), 0, LWA_COLORKEY);
+
+	//SetLayeredWindowAttributes(overlayWindow, RGB(0, 255, 0), 0, LWA_COLORKEY);
 	
-	HDC hdcScreen = GetDC(NULL);
+	/*HDC hdcScreen = GetDC(NULL);
 	HDC hdcOverlay = CreateCompatibleDC(hdcScreen);
-	HBRUSH hBrush = CreateSolidBrush(RGB(255, 0, 0));
+	HBRUSH hBrush = CreateSolidBrush(RGB(0, 255, 0));
 	HBRUSH hOldBrush = (HBRUSH)SelectObject(hdcOverlay, hBrush);
 
 	RECT rect = { 0, 0, rc.right - rc.left, rc.bottom - rc.top};
@@ -222,7 +223,7 @@ void setOverlay(HWND hWnd, HDC hdc, COLORREF color, HINSTANCE hInstance)
 	BLENDFUNCTION blendFunc;
 	blendFunc.BlendOp = AC_SRC_OVER;
 	blendFunc.BlendFlags = 0;
-	blendFunc.SourceConstantAlpha = 255;
+	blendFunc.SourceConstantAlpha = 100;
 	blendFunc.AlphaFormat = AC_SRC_ALPHA;
 
 	POINT ptSrc = { 0, 0 };
@@ -233,8 +234,14 @@ void setOverlay(HWND hWnd, HDC hdc, COLORREF color, HINSTANCE hInstance)
 
 	DeleteDC(hdcOverlay);
 	DeleteObject(hBrush);
-	ReleaseDC(NULL, hdcScreen);
+	ReleaseDC(NULL, hdcScreen); */
+
 
 	SetWindowPos(overlayWindow, hWnd, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, SWP_NOACTIVATE | SWP_NOREDRAW);
+
+	SetWindowLong(overlayWindow, GWL_EXSTYLE, GetWindowLong(overlayWindow, GWL_EXSTYLE) | WS_EX_LAYERED);
+	SetLayeredWindowAttributes(overlayWindow, 0, (255 * 50) / 100, LWA_ALPHA);
+
 	ShowWindow(overlayWindow, SW_SHOW);
+	UpdateWindow(overlayWindow);
 }
