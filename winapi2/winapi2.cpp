@@ -42,25 +42,6 @@ HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
-UINT currentlyChecked = IDM_DIFFICULTY_EASY;
-float gameTime = 0.0f;
-int wordCount = 6;
-HWND gameWindows[WINDOWAMOUNT];
-int currentLetter = 0;
-int currentLine[WINDOWAMOUNT] = {};
-char letters[MAXWORDS][LETTERSAMOUNT];
-RECT letterRect[MAXWORDS][LETTERSAMOUNT];
-std::set<std::string> dictionary;
-RECT keyboard[128][WINDOWAMOUNT + 1];
-char keyboardLetters[26] = 
-  { 'q', 'w', 'e', 'r', 't', 'y','u', 'i', 'o', 'p',
-    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l',
-    'z', 'x', 'c', 'v', 'b', 'n', 'm' };
-std::string chosenWords[WINDOWAMOUNT];
-int color[WINDOWAMOUNT][MAXWORDS][LETTERSAMOUNT] = {};
-bool finished[WINDOWAMOUNT] = {};
-int letterColor[128] = {};
-
 
 
 
@@ -196,11 +177,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    rc = { 0, 0, ROWWIDTH, 0};
    AdjustWindowRectEx(&rc, WS_OVERLAPPEDWINDOW, false, 0);
   
-   for (int i = 0; i < 4; i++)
+   for (int i = 0; i < WINDOWAMOUNT; i++)
    {
-
-    gameWindows[i] = CreateWindowW(L"GAME CLASS", L"WORDLE - PUZZLE", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-       0, 0, rc.right - rc.left, 0, hWnd, nullptr, hInst, nullptr);
+       gameWindows[i] = CreateWindowW(L"GAME CLASS", L"WORDLE - PUZZLE",  WS_CAPTION,
+           0, 0, rc.right - rc.left, 0, hWnd, nullptr, hInst, nullptr);
    }
 
    if (!hWnd)
@@ -214,12 +194,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    LoadDictionary(dictionary);
 
    if(currentlyChecked == IDM_DIFFICULTY_EASY)
-    setEasyLevel(gameWindows, nCmdShow, WINDOWAMOUNT, ROWHEIGHT);
+    setEasyLevel(gameWindows, nCmdShow, WINDOWAMOUNT, ROWHEIGHT, wordCount);
    if (currentlyChecked == IDM_DIFFICULTY_MEDIUM)
-       setMediumLevel(gameWindows, nCmdShow, WINDOWAMOUNT, ROWHEIGHT);
+       setMediumLevel(gameWindows, nCmdShow, WINDOWAMOUNT, ROWHEIGHT, wordCount);
    if (currentlyChecked == IDM_DIFFICULTY_HARD)
-       setHardLevel(gameWindows, nCmdShow, WINDOWAMOUNT, ROWHEIGHT);
-   StartGame(currentLine, currentLetter, chosenWords, currentlyChecked, dictionary);
+       setHardLevel(gameWindows, nCmdShow, WINDOWAMOUNT, ROWHEIGHT, wordCount);
+   StartGame(currentLine, currentLetter, chosenWords, currentlyChecked, dictionary, letters, color, finished, letterColor);
 
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
@@ -240,6 +220,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+
     switch (message)
     {
     case WM_COMMAND:
@@ -252,55 +233,80 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 CheckMenuItem(menu, currentlyChecked, MF_UNCHECKED);
                 currentlyChecked = wmId;
             }
-
-            gameTime = 0;
-            // Parse the menu selections:
             switch (wmId)
             {
             case IDM_DIFFICULTY_EASY: 
-                wordCount = 6;
-                setEasyLevel(gameWindows, SW_SHOW, WINDOWAMOUNT, ROWHEIGHT);
+
+                setEasyLevel(gameWindows, SW_SHOW, WINDOWAMOUNT, ROWHEIGHT, wordCount);
                 break;
             case IDM_DIFFICULTY_MEDIUM:
-                wordCount = 8;
-                setMediumLevel(gameWindows, SW_SHOW, WINDOWAMOUNT, ROWHEIGHT);
+
+                setMediumLevel(gameWindows, SW_SHOW, WINDOWAMOUNT, ROWHEIGHT, wordCount);
                 break;
             case IDM_DIFFICULTY_HARD:
-                wordCount = 10;
-                setHardLevel(gameWindows, SW_SHOW, WINDOWAMOUNT, ROWHEIGHT);
+
+                setHardLevel(gameWindows, SW_SHOW, WINDOWAMOUNT, ROWHEIGHT, wordCount);
                 break;
-            default:
+            default: 
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
         }
-        StartGame(currentLine, currentLetter, chosenWords, currentlyChecked, dictionary);
+        StartGame(currentLine, currentLetter, chosenWords, currentlyChecked, dictionary, letters, color, finished, letterColor);
+        InvalidateRect(hWnd, NULL, true);
+        for (int j = 0; j < WINDOWAMOUNT; j++)
+            InvalidateRect(gameWindows[j], NULL, true);
         break;
     case WM_PAINT:
         {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
-            HPEN oldPen = (HPEN)(SelectObject(hdc, GetStockObject(DC_PEN)));
-            SetDCPenColor(hdc, RGB(164, 174, 196));
 
-            HBRUSH brush = CreateSolidBrush(RGB(251, 251, 255));
-            HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, brush);
-            
+            HDC offDC;
+            HBITMAP offOldBitmap;
+            HBITMAP offBitmap;
             RECT rc;
+
             GetClientRect(hWnd, &rc);
+            offDC = CreateCompatibleDC(hdc);
+            offBitmap = CreateCompatibleBitmap(hdc, rc.right - rc.left, rc.bottom - rc.top);
+            offOldBitmap = (HBITMAP)SelectObject(offDC, offBitmap);
+            HPEN oldPen = (HPEN)(SelectObject(offDC, GetStockObject(DC_PEN)));
+            HBRUSH oldBrush = (HBRUSH)SelectObject(offDC, GetStockObject(DC_BRUSH));
+
+            SetDCBrushColor(offDC, RGB(255, 255, 255));
+            SetDCPenColor(offDC, RGB(255, 255, 255));
+            Rectangle(offDC, 0, 0, rc.right, rc.bottom);
             
             for (int i = 0; i < 26; i++)
             {
-                RoundRect(hdc, keyboard[keyboardLetters[i]][WINDOWAMOUNT].left, keyboard[keyboardLetters[i]][WINDOWAMOUNT].top,
+                HPEN oldPen = (HPEN)(SelectObject(offDC, GetStockObject(DC_PEN)));
+                HBRUSH oldBrush = (HBRUSH)SelectObject(offDC, GetStockObject(DC_BRUSH));
+                SetDCPenColor(offDC, RGB(164, 174, 196));
+                SetDCBrushColor(offDC, RGB(251, 251, 255));
+                RoundRect(offDC, keyboard[keyboardLetters[i]][WINDOWAMOUNT].left, keyboard[keyboardLetters[i]][WINDOWAMOUNT].top,
                     keyboard[keyboardLetters[i]][WINDOWAMOUNT].right, keyboard[keyboardLetters[i]][WINDOWAMOUNT].bottom,
                     MARGIN, MARGIN);
+                oldPen = (HPEN)(SelectObject(offDC, GetStockObject(NULL_PEN)));
+                for (int j = 0; j < WINDOWAMOUNT; j++)
+                {
+                    if(letterColor[j][keyboardLetters[i]] == 2)
+                        SetDCBrushColor(offDC, RGB(121, 184, 81));
+                    else if (letterColor[j][keyboardLetters[i]] == 1)
+                        SetDCBrushColor(offDC, RGB(243, 194, 55));
+                    else if (letterColor[j][keyboardLetters[i]] == -1)
+                        SetDCBrushColor(offDC, RGB(164, 174, 196));
+                    RoundRect(offDC, keyboard[keyboardLetters[i]][j].left, keyboard[keyboardLetters[i]][j].top,
+                        keyboard[keyboardLetters[i]][j].right, keyboard[keyboardLetters[i]][j].bottom, MARGIN/4, MARGIN/4);
+
+                }
                 wchar_t s[2];
                 swprintf_s(s, 2, L"%c", toupper(keyboardLetters[i]));
-                DrawText(hdc, s, 1, &keyboard[keyboardLetters[i]][WINDOWAMOUNT], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                SetBkMode(offDC, TRANSPARENT);
+                DrawText(offDC, s, 1, &keyboard[keyboardLetters[i]][WINDOWAMOUNT], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                BitBlt(hdc, 0, 0, rc.right, rc.bottom, offDC, 0, 0, SRCCOPY);
+                SelectObject(offDC, oldBrush);
+                SelectObject(offDC, oldPen);
             }
-            SelectObject(hdc, oldPen);
-            SelectObject(hdc, oldBrush);
-            DeleteObject(brush);
-
             EndPaint(hWnd, &ps);
         }
         break;
@@ -319,7 +325,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
             posY += TILESIZE + MARGIN;
         }
-        SetTimer(hWnd, GAMETIME_ID, 10, NULL);
+
 
         RECT rc;
         GetClientRect(hWnd, &rc);
@@ -329,13 +335,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             RECT rect = { start, MARGIN, start + TILESIZE, TILESIZE + MARGIN };
             keyboard[keyboardLetters[i]][WINDOWAMOUNT] = rect;
-            RECT rect1 = { rect.left, rect.top, (rect.left + rect.right) / 2, (rect.bottom + rect.top) / 2 };
+            RECT rect1 = { rect.left + 1, rect.top + 1, (rect.left + rect.right) / 2 + 1, (rect.bottom + rect.top) / 2 + 1 };
             keyboard[keyboardLetters[i]][0] = rect1;
-            RECT rect2 = { (rect.left + rect.right) / 2, rect.top, rect.right, (rect.bottom + rect.top) / 2 };
+            RECT rect2 = { (rect.left + rect.right) / 2 - 1, rect.top + 1, rect.right, (rect.bottom + rect.top) / 2 + 1};
             keyboard[keyboardLetters[i]][1] = rect2;
-            RECT rect3 = { rect.left, (rect.bottom + rect.top) / 2, (rect.left + rect.right) / 2, rect.bottom };
+            RECT rect3 = { rect.left + 1, (rect.bottom + rect.top) / 2, (rect.left + rect.right) / 2 + 1, rect.bottom };
             keyboard[keyboardLetters[i]][2] = rect3;
-            RECT rect4 = { (rect.left + rect.right) / 2, (rect.bottom + rect.top) / 2, rect.right, rect.bottom };
+            RECT rect4 = { (rect.left + rect.right) / 2 - 1, (rect.bottom + rect.top) / 2 - 1, rect.right, rect.bottom };
             keyboard[keyboardLetters[i]][3] = rect4;
 
             start += TILESIZE + MARGIN;
@@ -345,6 +351,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             RECT rect = { start, TILESIZE + 2 * MARGIN, start + TILESIZE,  2 * TILESIZE + 2 * MARGIN };
             keyboard[keyboardLetters[i + 10]][WINDOWAMOUNT] = rect;
+            RECT rect1 = { rect.left + 1, rect.top + 1, (rect.left + rect.right) / 2 + 1, (rect.bottom + rect.top) / 2 + 1};
+            keyboard[keyboardLetters[i + 10]][0] = rect1;
+            RECT rect2 = { (rect.left + rect.right) / 2 - 1, rect.top + 1, rect.right, (rect.bottom + rect.top) / 2 + 1};
+            keyboard[keyboardLetters[i + 10]][1] = rect2;
+            RECT rect3 = { rect.left + 1, (rect.bottom + rect.top) / 2, (rect.left + rect.right) / 2 + 1, rect.bottom };
+            keyboard[keyboardLetters[i + 10]][2] = rect3;
+            RECT rect4 = { (rect.left + rect.right) / 2 - 1, (rect.bottom + rect.top) / 2 - 1, rect.right, rect.bottom };
+            keyboard[keyboardLetters[i + 10]][3] = rect4;
             start += TILESIZE + MARGIN;
         }
         start = ((rc.right - rc.left) - 7 * (TILESIZE + MARGIN)) / 2;
@@ -352,20 +366,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             RECT rect = { start, 2 * TILESIZE + 3 * MARGIN, start + TILESIZE, 3 * TILESIZE + 3 * MARGIN };
             keyboard[keyboardLetters[i + 19]][WINDOWAMOUNT] = rect;
+            RECT rect1 = { rect.left + 1, rect.top + 1, (rect.left + rect.right) / 2 + 1, (rect.bottom + rect.top) / 2 + 1 };
+            keyboard[keyboardLetters[i + 19]][0] = rect1;
+            RECT rect2 = { (rect.left + rect.right) / 2 - 1, rect.top + 1, rect.right, (rect.bottom + rect.top) / 2 + 1};
+            keyboard[keyboardLetters[i + 19]][1] = rect2;
+            RECT rect3 = { rect.left + 1, (rect.bottom + rect.top) / 2, (rect.left + rect.right) / 2 + 1, rect.bottom };
+            keyboard[keyboardLetters[i + 19]][2] = rect3;
+            RECT rect4 = { (rect.left + rect.right) / 2 - 1, (rect.bottom + rect.top) / 2 - 1, rect.right, rect.bottom };
+            keyboard[keyboardLetters[i + 19]][3] = rect4;
             start += TILESIZE + MARGIN;
-        }
-
-    }
-        break;
-    case WM_TIMER:
-    {
-        if (wParam == GAMETIME_ID)
-        {
-            gameTime += 0.1f;
-            wchar_t s[256];
-             swprintf_s(s, 256,
-                L" WORDLE-KEYBOARD gameTime: %f seconds", gameTime);
-            SetWindowText(hWnd, s);
         }
     }
         break;
@@ -385,26 +394,41 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     {
                         for (int i = 0; i < LETTERSAMOUNT; i++)
                         {
+                            char let = s[i];
                             if (contains(s[i], chosenWords[j]))
                             {
-                                if(s[i] == chosenWords[j][i])
+                                if (s[i] == chosenWords[j][i])
+                                {
                                     color[j][currentLine[j]][i] = 2;
+                                    letterColor[j][let] = 2;
+                                }
                                 else
-                                    color[j][currentLine[j]][i] = 1;
+                                {
+                                    color[j][currentLine[j]][i] = 1 ;
+                                    letterColor[j][let] = max(1, letterColor[j][let]);
+                                }
                             }
                             else
                             {
                                 color[j][currentLine[j]][i] = -1;
+                                letterColor[j][let] = -1;
                             }
                         }
+                        if(finished[j] == false)
+                            animate[j] = true;
                         if (s == chosenWords[j])
                         {
                             finished[j] = true;
+                            animate[j] = true;
                         }
-
                         currentLine[j]++;
                         currentLetter = 0;
+                        
+                        percent = 0;
+                        SetTimer(hWnd, 1, 10, NULL);
                         InvalidateRect(gameWindows[j], NULL, TRUE);
+                        InvalidateRect(hWnd, NULL, true);
+                        
                     }
                     else
                     {
@@ -437,12 +461,38 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
                 letters[currentLine[i]][currentLetter - 1] = (char)wParam;
                 InvalidateRect(gameWindows[i], NULL, TRUE);
-
             }
         }
         break;
     case WM_DESTROY:
         saveConfig(currentlyChecked);
+        break;
+
+    case WM_TIMER:
+        
+        if (percent > 1)
+        {
+            percent = 0;
+            animationLetter++;
+        }
+
+        if (animationLetter >= LETTERSAMOUNT)
+        {
+                KillTimer(hWnd, 1);
+                percent = 0;
+                animationLetter = 0;
+                for(int i = 0; i < WINDOWAMOUNT; i++)
+                    animate[i] = false;
+        }
+        else
+            percent += 0.1;
+        for (int i = 0; i < WINDOWAMOUNT; i++)
+        {
+            InvalidateRect(gameWindows[i], NULL, true);
+        }
+        
+        
+        break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
@@ -451,69 +501,96 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 LRESULT CALLBACK WndProcGame(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    static HDC offDC = NULL;
-    static HBITMAP offOldBitmap = NULL;
-    static HBITMAP offBitmap = NULL;
-
     switch (message)
     {
+    case WM_NCHITTEST: {
+        LRESULT hit = DefWindowProc(hWnd, message, wParam, lParam);
+        if (hit == HTCLIENT) 
+            hit = HTCAPTION;
+        return hit;
+    }
     case WM_PAINT:
     {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
-        HPEN oldPen = (HPEN) (SelectObject(hdc, GetStockObject(DC_PEN)));
-        HBRUSH oldBrush = (HBRUSH) SelectObject(hdc, GetStockObject(DC_BRUSH));
-
         int k = 0;
         if (hWnd == gameWindows[1]) k = 1;
         if (hWnd == gameWindows[2]) k = 2;
         if (hWnd == gameWindows[3]) k = 3;
+        
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        
+        HDC offDC;
+        HBITMAP offOldBitmap;
+        HBITMAP offBitmap;
+        RECT rc;
+
+        GetClientRect(hWnd, &rc);
+        offDC = CreateCompatibleDC(hdc);
+        offBitmap = CreateCompatibleBitmap(hdc, rc.right - rc.left, rc.bottom - rc.top);
+        offOldBitmap = (HBITMAP)SelectObject(offDC, offBitmap);
+        HPEN oldPen = (HPEN) (SelectObject(offDC, GetStockObject(DC_PEN)));
+        HBRUSH oldBrush = (HBRUSH) SelectObject(offDC, GetStockObject(DC_BRUSH));
+        
+        SetDCBrushColor(offDC, RGB(255, 255, 255));
+        SetDCPenColor(offDC, RGB(255, 255, 255));
+        Rectangle(offDC, 0, 0, rc.right, rc.bottom);
+
 
         for (int i = 0; i < wordCount; i++)
         {
             for (int j = 0; j < LETTERSAMOUNT; j++)
             {
-                SetDCBrushColor(hdc, RGB(251, 251, 255));
-                SetDCPenColor(hdc, RGB(164, 174, 196));
-                SetBkColor(hdc, RGB(251, 251, 255));
+                SetDCBrushColor(offDC, RGB(251, 251, 255));
+                SetDCPenColor(offDC, RGB(164, 174, 196));
+                RoundRect(offDC, letterRect[i][j].left, letterRect[i][j].top, letterRect[i][j].right, letterRect[i][j].bottom, MARGIN, MARGIN);
 
-
-                if (color[k][i][j] == -1)
+                if (color[k][i][j] == -1 && (!(i == currentLine[k] -1 && j > animationLetter) ||  animate[k] == false))
                 {
-                    SetDCBrushColor(hdc, RGB(164, 174, 196));
-                    SetDCPenColor(hdc, RGB(164, 174, 196));
-                    SetBkColor(hdc, RGB(164, 174, 196));
+                    SetDCBrushColor(offDC, RGB(164, 174, 196));
+                    SetDCPenColor(offDC, RGB(164, 174, 196));
                 }
-                if (color[k][i][j] == 1)
+                if (color[k][i][j] == 1 && (!(i == currentLine[k] -1 && j > animationLetter) || animate[k] == false))
                 {
-                    SetDCBrushColor(hdc, RGB(243, 194, 55));
-                    SetDCPenColor(hdc, RGB(243, 194, 55));
-                    SetBkColor(hdc, RGB(243, 194, 55));
+                    SetDCBrushColor(offDC, RGB(243, 194, 55));
+                    SetDCPenColor(offDC, RGB(243, 194, 55));
                 }
-                if (color[k][i][j] == 2)
+                if (color[k][i][j] == 2 && (!(i == currentLine[k] - 1&& j > animationLetter) || animate[k] == false))
                 {
-                    SetDCBrushColor(hdc, RGB(121, 184, 81));
-                    SetDCPenColor(hdc, RGB(121, 184, 81));
-                    SetBkColor(hdc, RGB(121, 184, 81));
+                    SetDCBrushColor(offDC, RGB(121, 184, 81));
+                    SetDCPenColor(offDC, RGB(121, 184, 81));
                 }
 
-                RoundRect(hdc, letterRect[i][j].left, letterRect[i][j].top, letterRect[i][j].right, letterRect[i][j].bottom, MARGIN, MARGIN);
+                if(i == currentLine[k] - 1 && j == animationLetter && animate[k] == true)
+                    RoundRect(offDC, letterRect[i][j].left,
+                        (letterRect[i][j].top + letterRect[i][j].bottom) / 2 - (percent * ((letterRect[i][j].bottom - letterRect[i][j].top) / 2)),
+                        letterRect[i][j].right, 
+                        (letterRect[i][j].top + letterRect[i][j].bottom) / 2 + (percent) * (letterRect[i][j].bottom - letterRect[i][j].top)/2,
+                        MARGIN, MARGIN);
+                else
+                    RoundRect(offDC, letterRect[i][j].left, letterRect[i][j].top , letterRect[i][j].right, letterRect[i][j].bottom, MARGIN, MARGIN);
+
+
+
                 if (i < currentLine[k] || (i == currentLine[k] && j < currentLetter))
                 {
                     wchar_t s[2];
                     swprintf_s(s, 2, L"%c", toupper(letters[i][j]));
-                    DrawText(hdc, s, 1, &letterRect[i][j], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                    SetBkMode(offDC, TRANSPARENT);
+                    DrawText(offDC, s, 1, &letterRect[i][j], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                 }
-
             }
         }
+        if (finished[k] && animate[k] == false)
+            setOverlayWin(hWnd, offDC);
+        else if (currentLine[k] >= wordCount && animate[k] == false)
+        {
+            setOverlayLose(hWnd, offDC, chosenWords[k]);
+        }
+        BitBlt(hdc, 0, 0, rc.right, rc.bottom, offDC, 0, 0, SRCCOPY);
+        SelectObject(offDC, oldPen);
+        SelectObject(offDC, oldBrush);
 
-        SelectObject(hdc, oldPen);
-        SelectObject(hdc, oldBrush);
-
-        if (finished[k])
-            setOverlay(hWnd, hdc, 0, hInst);
-
+        
         EndPaint(hWnd, &ps);
     }
     break;
@@ -524,10 +601,16 @@ LRESULT CALLBACK WndProcGame(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
     case WM_CREATE:
     {
         HDC hdc = GetDC(hWnd);
-        offDC = CreateCompatibleDC(hdc);
+        
         ReleaseDC(hWnd, hdc);
         break;
+ 
     }
+    case WM_TIMER:
+    {
+       
+    }
+    break;
     case WM_ERASEBKGND:
         return 1;
     default:
@@ -540,15 +623,6 @@ LRESULT CALLBACK WndProcOverlay(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 {
     switch (message)
     {
-    case WM_PAINT:
-    {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
-
-        EndPaint(hWnd, &ps);
-    }
-    break;
-
     case WM_DESTROY:
         PostQuitMessage(0);
         break;

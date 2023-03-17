@@ -1,4 +1,7 @@
 ﻿  winapi2.cpp
-C:\Users\adam\Desktop\projekty\wordle\winapi2\winapi2.h(149,27): warning C4267: "inicjowanie": konwersja z "size_t" do "int", możliwa utrata danych
-C:\Users\adam\Desktop\projekty\wordle\winapi2\winapi2.cpp(75,15): warning C4244: "argument": konwersja z "time_t" do "unsigned int", możliwa utrata danych
+C:\Users\adam\Desktop\projekty\wordle\winapi2\winapi2.h(240,27): warning C4267: "inicjowanie": konwersja z "size_t" do "int", możliwa utrata danych
+C:\Users\adam\Desktop\projekty\wordle\winapi2\winapi2.cpp(57,15): warning C4244: "argument": konwersja z "time_t" do "unsigned int", możliwa utrata danych
+C:\Users\adam\Desktop\projekty\wordle\winapi2\winapi2.cpp(488,27): warning C4305: "+=": obcięcie z "double" do "float"
+C:\Users\adam\Desktop\projekty\wordle\winapi2\winapi2.cpp(567,78): warning C4244: "argument": konwersja z "float" do "int", możliwa utrata danych
+C:\Users\adam\Desktop\projekty\wordle\winapi2\winapi2.cpp(565,78): warning C4244: "argument": konwersja z "float" do "int", możliwa utrata danych
   winapi2.vcxproj -> C:\Users\adam\Desktop\projekty\wordle\x64\Debug\winapi2.exe
